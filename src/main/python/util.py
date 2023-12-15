@@ -210,6 +210,34 @@ class KeycodeDisplay:
             widget.setMaskColor(None)
 
     @classmethod
+    def display_mag(cls, widget, code, mag_args):
+        text = cls.get_label(code)
+        tooltip = Keycode.tooltip(code)
+        mask = Keycode.is_mask(code)
+        mask_text = ""
+        inner = Keycode.find_inner_keycode(code)
+        if inner:
+            mask_text = cls.get_label(inner.qmk_id)
+        if mask:
+            text = text.split("\n")[0]
+        widget.masked = mask
+        if mag_args[1] >= 1:
+            # widget.setText(str(mag_args[0])+'\n↑'+str(mag_args[2])+'↓'+str(mag_args[3]))
+            widget.setText(str(mag_args[0])+'\n↑'+str(mag_args[2]))
+        else:
+            widget.setText(str(mag_args[0])+'\nX')
+        widget.setMaskText(mask_text)
+        widget.setToolTip(tooltip)
+        if cls.code_is_overriden(code):
+            widget.setColor(QApplication.palette().color(QPalette.Link))
+        else:
+            widget.setColor(None)
+        if inner and mask and cls.code_is_overriden(inner.qmk_id):
+            widget.setMaskColor(QApplication.palette().color(QPalette.Link))
+        else:
+            widget.setMaskColor(None)
+
+    @classmethod
     def set_keymap_override(cls, override):
         cls.keymap_override = override
         for client in cls.clients:

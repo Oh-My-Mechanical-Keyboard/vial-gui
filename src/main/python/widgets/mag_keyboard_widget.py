@@ -10,7 +10,7 @@ from constants import KEY_SIZE_RATIO, KEY_SPACING_RATIO, KEYBOARD_WIDGET_PADDING
 from themes import Theme
 
 
-class KeyWidget:
+class MagKeyWidget:
 
     def __init__(self, desc, scale, shift_x=0, shift_y=0):
         self.active = False
@@ -204,51 +204,7 @@ class KeyWidget:
             qualifiers.append("layout:{},{}".format(self.desc.layout_index, self.desc.layout_option))
         return " ".join(qualifiers)
 
-
-class EncoderWidget(KeyWidget):
-
-    def calculate_background_draw_path(self):
-        path = QPainterPath()
-        path.addEllipse(round(self.x), round(self.y), round(self.w), round(self.h))
-        return path
-
-    def calculate_foreground_draw_path(self):
-        path = QPainterPath()
-        path.addEllipse(
-            round(self.x + self.size * SHADOW_SIDE_PADDING),
-            round(self.y + self.size * SHADOW_TOP_PADDING),
-            round(self.w - 2 * self.size * SHADOW_SIDE_PADDING),
-            round(self.h - self.size * (SHADOW_BOTTOM_PADDING + SHADOW_TOP_PADDING))
-        )
-        return path
-
-    def calculate_extra_draw_path(self):
-        path = QPainterPath()
-        # midpoint of arrow triangle
-        p = self.h
-        x = self.x
-        y = self.y + p / 2
-        if self.desc.encoder_dir == 0:
-            # counterclockwise - pointing down
-            path.moveTo(round(x), round(y))
-            path.lineTo(round(x + p / 10), round(y - p / 10))
-            path.lineTo(round(x), round(y + p / 10))
-            path.lineTo(round(x - p / 10), round(y - p / 10))
-            path.lineTo(round(x), round(y))
-        else:
-            # clockwise - pointing up
-            path.moveTo(round(x), round(y))
-            path.lineTo(round(x + p / 10), round(y + p / 10))
-            path.lineTo(round(x), round(y - p / 10))
-            path.lineTo(round(x - p / 10), round(y + p / 10))
-            path.lineTo(round(x), round(y))
-        return path
-
-    def __repr__(self):
-        return "EncoderWidget"
-
-
-class KeyboardWidget(QWidget):
+class MagKeyboardWidget(QWidget):
 
     clicked = pyqtSignal()
     deselected = pyqtSignal()
@@ -282,7 +238,7 @@ class KeyboardWidget(QWidget):
         self.common_widgets = []
         self.widgets_for_layout = []
 
-        self.add_keys([(x, KeyWidget) for x in keys] + [(x, EncoderWidget) for x in encoders])
+        self.add_keys([(x, MagKeyWidget) for x in keys])
         self.update_layout()
 
     def add_keys(self, keys):

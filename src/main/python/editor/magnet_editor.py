@@ -7,14 +7,16 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from any_keycode_dialog import AnyKeycodeDialog
 from editor.basic_editor import BasicEditor
 from widgets.keyboard_widget import KeyboardWidget, EncoderWidget
+from widgets.mag_keyboard_widget import MagKeyboardWidget
 from keycodes.keycodes import Keycode
 from widgets.square_button import SquareButton
 from tabbed_keycodes import TabbedKeycodes, keycode_filter_masked
+from table_mag_args import MagTabbedKeycodes, mag_keycode_filter_masked
 from util import tr, KeycodeDisplay
 from vial_device import VialKeyboard
 
 
-class ClickableWidget(QWidget):
+class MAG_ClickableWidget(QWidget):
 
     clicked = pyqtSignal()
 
@@ -23,7 +25,7 @@ class ClickableWidget(QWidget):
         self.clicked.emit()
 
 
-class KeymapEditor(BasicEditor):
+class MagKeymapEditor(BasicEditor):
 
     def __init__(self, layout_editor):
         super().__init__()
@@ -41,7 +43,7 @@ class KeymapEditor(BasicEditor):
         layout_labels_container.addLayout(self.layout_size)
 
         # contains the actual keyboard
-        self.container = KeyboardWidget(layout_editor)
+        self.container = MagKeyboardWidget(layout_editor)
         self.container.clicked.connect(self.on_key_clicked)
         self.container.deselected.connect(self.on_key_deselected)
 
@@ -49,7 +51,7 @@ class KeymapEditor(BasicEditor):
         layout.addLayout(layout_labels_container)
         layout.addWidget(self.container)
         layout.setAlignment(self.container, Qt.AlignHCenter)
-        w = ClickableWidget()
+        w = MAG_ClickableWidget()
         w.setLayout(layout)
         w.clicked.connect(self.on_empty_space_clicked)
 
@@ -61,9 +63,12 @@ class KeymapEditor(BasicEditor):
 
         self.container.anykey.connect(self.on_any_keycode)
 
-        self.tabbed_keycodes = TabbedKeycodes()
-        self.tabbed_keycodes.keycode_changed.connect(self.on_keycode_changed)
-        self.tabbed_keycodes.anykey.connect(self.on_any_keycode)
+        self.tabbed_keycodes = MagTabbedKeycodes()
+        # self.tabbed_keycodes.make_tray()
+        self.tabbed_keycodes.th_val_changed.connect(self.on_th_val_changed)
+        self.tabbed_keycodes.rt_sw_changed.connect(self.on_rt_sw_changed)
+        self.tabbed_keycodes.rt_th_val_changed.connect(self.on_rt_th_val_changed)
+        # self.tabbed_keycodes.anykey.connect(self.on_any_keycode)
 
         self.addWidget(w)
         self.addWidget(self.tabbed_keycodes)
@@ -75,8 +80,15 @@ class KeymapEditor(BasicEditor):
         self.container.deselect()
         self.container.update()
 
-    def on_keycode_changed(self, code):
-        self.set_key(code)
+    def on_th_val_changed(self, val):
+        print(val)
+        self.set_mag_val_u8(3, val)
+    def on_rt_sw_changed(self, sw):
+        print(sw)
+        self.set_rt_sw(sw)
+    def on_rt_th_val_changed(self, val):
+        print(val)
+        self.set_mag_val_u8(5, val)
 
     def rebuild_layers(self):
         # delete old layer labels
@@ -86,14 +98,15 @@ class KeymapEditor(BasicEditor):
         self.layer_buttons = []
 
         # create new layer labels
-        for x in range(self.keyboard.layers):
-            btn = SquareButton(str(x))
-            btn.setFocusPolicy(Qt.NoFocus)
-            btn.setRelSize(1.667)
-            btn.setCheckable(True)
-            btn.clicked.connect(lambda state, idx=x: self.switch_layer(idx))
-            self.layout_layers.addWidget(btn)
-            self.layer_buttons.append(btn)
+
+        x = 1
+        btn = SquareButton(str(x))
+        btn.setFocusPolicy(Qt.NoFocus)
+        btn.setRelSize(1.667)
+        btn.setCheckable(True)
+        btn.clicked.connect(lambda state, idx=x: self.switch_layer(idx))
+        self.layout_layers.addWidget(btn)
+        self.layer_buttons.append(btn)
         for x in range(0,2):
             btn = SquareButton("-") if x else SquareButton("+")
             btn.setFocusPolicy(Qt.NoFocus)
@@ -122,8 +135,9 @@ class KeymapEditor(BasicEditor):
             self.current_layer = 0
             self.on_layout_changed()
 
-            self.tabbed_keycodes.recreate_keycode_buttons()
-            TabbedKeycodes.tray.recreate_keycode_buttons()
+            # self.tabbed_keycodes.recreate_keycode_buttons()
+            # self.tabbed_keycodes.make_tray()
+            # MagTabbedKeycodes.tray.recreate_keycode_buttons()
             self.refresh_layer_display()
         self.container.setEnabled(self.valid())
 
@@ -167,6 +181,13 @@ class KeymapEditor(BasicEditor):
         else:
             return self.keyboard.encoder_layout[(self.current_layer, widget.desc.encoder_idx,
                                                  widget.desc.encoder_dir)]
+    def mag_code_for_widget(self, widget):
+            mag_args = []
+            mag_args.append(self.keyboard.mag_th_lv_layout[(widget.desc.row, widget.desc.col)])
+            mag_args.append(self.keyboard.mag_rt_sw_layout[(widget.desc.row, widget.desc.col)])
+            mag_args.append(self.keyboard.mag_rt_lv_layout[(widget.desc.row, widget.desc.col)])
+            mag_args.append(self.keyboard.mag_rt_set_lv_layout[(widget.desc.row, widget.desc.col)])
+            return mag_args
 
     def refresh_layer_display(self):
         """ Refresh text on key widgets to display data corresponding to current layer """
@@ -179,7 +200,8 @@ class KeymapEditor(BasicEditor):
 
         for widget in self.container.widgets:
             code = self.code_for_widget(widget)
-            KeycodeDisplay.display_keycode(widget, code)
+            mag_args = self.mag_code_for_widget(widget)
+            KeycodeDisplay.display_mag(widget, code, mag_args)
         self.container.update()
         self.container.updateGeometry()
 
@@ -188,18 +210,70 @@ class KeymapEditor(BasicEditor):
         self.current_layer = idx
         self.refresh_layer_display()
 
-    def set_key(self, keycode):
+    def set_th_lv(self, keycode):
         """ Change currently selected key to provided keycode """
 
         if self.container.active_key is None:
+            print("none active_key key")
             return
 
-        if isinstance(self.container.active_key, EncoderWidget):
-            self.set_key_encoder(keycode)
-        else:
-            self.set_key_matrix(keycode)
+        l, r, c = self.current_layer, self.container.active_key.desc.row, self.container.active_key.desc.col
 
-        self.container.select_next()
+        if r >= 0 and c >= 0:
+            self.keyboard.set_th_lv(r, c, keycode)
+            self.refresh_layer_display()
+
+    def set_rt_sw(self, sw):
+        if (sw != 0):
+            sw = 1
+        """ Change currently selected key to provided keycode """
+
+        if self.container.active_key is None:
+            print("none active_key key")
+            return
+
+        l, r, c = self.current_layer, self.container.active_key.desc.row, self.container.active_key.desc.col
+
+        if r >= 0 and c >= 0:
+            self.keyboard.set_rt_sw(r, c, sw)
+            self.refresh_layer_display()
+
+    def set_mag_val_u8(self, field, val):
+        if (val >= 255):
+            val = 255
+        if (val <= 0):
+            val = 0
+        """ Change currently selected key to provided keycode """
+
+        if self.container.active_key is None:
+            print("none active_key key")
+            return
+
+        l, r, c = self.current_layer, self.container.active_key.desc.row, self.container.active_key.desc.col
+
+        if r >= 0 and c >= 0:
+            if field == 3:
+                self.keyboard.set_th_lv(r, c, val)
+            elif field == 5:
+                self.keyboard.set_rt_th_lv(r, c, val)
+            elif field == 6:
+                pass
+            elif field == 7:
+                pass
+            self.refresh_layer_display()
+    def set_rt_th_lv(self, keycode):
+        """ Change currently selected key to provided keycode """
+
+        if self.container.active_key is None:
+            print("none active_key key")
+            return
+
+        l, r, c = self.current_layer, self.container.active_key.desc.row, self.container.active_key.desc.col
+
+        if r >= 0 and c >= 0:
+            self.keyboard.set_rt_th_lv(r, c, keycode)
+            self.refresh_layer_display()
+
 
     def set_key_encoder(self, keycode):
         l, i, d = self.current_layer, self.container.active_key.desc.encoder_idx,\
@@ -236,13 +310,14 @@ class KeymapEditor(BasicEditor):
     def on_key_clicked(self):
         """ Called when a key on the keyboard widget is clicked """
         self.refresh_layer_display()
-        if self.container.active_mask:
-            self.tabbed_keycodes.set_keycode_filter(keycode_filter_masked)
-        else:
-            self.tabbed_keycodes.set_keycode_filter(None)
+        # if self.container.active_mask:
+        #     self.tabbed_keycodes.set_keycode_filter(keycode_filter_masked)
+        # else:
+        #     self.tabbed_keycodes.set_keycode_filter(None)
 
     def on_key_deselected(self):
-        self.tabbed_keycodes.set_keycode_filter(None)
+        # self.tabbed_keycodes.set_keycode_filter(None)
+        pass
 
     def on_layout_changed(self):
         if self.keyboard is None:

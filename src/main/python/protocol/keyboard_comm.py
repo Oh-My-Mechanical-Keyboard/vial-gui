@@ -44,6 +44,12 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
         self.encoderpos = OrderedDict()
         self.encoder_count = 0
         self.layout = dict()
+        self.mag_release_adc = dict()
+        self.mag_press_adc = dict()
+        self.mag_th_lv_layout = dict()
+        self.mag_rt_sw_layout = dict()
+        self.mag_rt_lv_layout = dict()
+        self.mag_rt_set_lv_layout = dict()
         self.encoder_layout = dict()
         self.rows = self.cols = self.layers = 0
         self.layout_labels = None
@@ -74,6 +80,12 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
         self.rowcol = OrderedDict()
         self.encoderpos = OrderedDict()
         self.layout = dict()
+        self.mag_release_adc = dict()
+        self.mag_press_adc = dict()
+        self.mag_th_lv_layout = dict()
+        self.mag_rt_sw_layout = dict()
+        self.mag_rt_lv_layout = dict()
+        self.mag_rt_set_lv_layout = dict()
         self.encoder_layout = dict()
 
         self.reload_layout(sideload_json)
@@ -91,6 +103,7 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
 
         # at this stage we have correct keycode info and can reload everything that depends on keycodes
         self.reload_keymap()
+        self.reload_mags()
         self.reload_macros_late()
         self.reload_tap_dance()
         self.reload_combo()
@@ -191,9 +204,19 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
                 idx, opt = key.labels[8].split(",")
                 key.layout_index, key.layout_option = int(idx), int(opt)
 
+    def reload_mags(self):
+        for row, col in self.rowcol.keys():
+            if row < self.rows or col < self.cols:
+                data = self.usb_send(self.dev, struct.pack("BBBBB", 0x02, 0x96, 7, row, col), retries=20)
+                self.mag_release_adc[(row, col)] = (data[5] << 8 | data[6]&0xff)
+                self.mag_press_adc[(row, col)] = (data[7] << 8 | data[8]&0xff)
+                self.mag_th_lv_layout[(row, col)] = data[9]
+                self.mag_rt_sw_layout[(row, col)] = data[10]
+                self.mag_rt_lv_layout[(row, col)] = data[11]
+                self.mag_rt_set_lv_layout[(row, col)] = data[12]
+
     def reload_keymap(self):
         """ Load current key mapping from the keyboard """
-
         keymap = b""
         # calculate what the size of keymap will be and retrieve the entire binary buffer
         size = self.layers * self.rows * self.cols * 2
@@ -307,6 +330,24 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
                                  retries=20)
             if data[0] == 0:
                 self.settings[qsid] = QmkSettings.qsid_deserialize(qsid, data[1:])
+
+    def set_th_lv(self, row, col, val):
+        key = (row, col)
+        if self.mag_th_lv_layout[key] != val:
+            self.usb_send(self.dev, struct.pack("BBBBBB", 0x03, 0x96, 0x03, row, col, val), retries=20)
+            self.mag_th_lv_layout[key] = val
+
+    def set_rt_sw(self, row, col, sw):
+        key = (row, col)
+        if self.mag_rt_sw_layout[key] != sw:
+            self.usb_send(self.dev, struct.pack("BBBBBB", 0x03, 0x96, 0x04, row, col, sw), retries=20)
+            self.mag_rt_sw_layout[key] = sw
+
+    def set_rt_th_lv(self, row, col, val):
+        key = (row, col)
+        if self.mag_rt_lv_layout[key] != val:
+            self.usb_send(self.dev, struct.pack("BBBBBB", 0x03, 0x96, 0x05, row, col, val), retries=20)
+            self.mag_rt_lv_layout[key] = val
 
     def set_key(self, layer, row, col, code):
         key = (layer, row, col)

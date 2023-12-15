@@ -15,8 +15,20 @@ from keycodes.keycodes import KEYCODES_BASIC, KEYCODES_ISO, KEYCODES_MACRO, KEYC
 from widgets.square_button import SquareButton
 from util import tr, KeycodeDisplay
 
+# SPDX-License-Identifier: GPL-2.0-or-later
+from PyQt5 import QtCore
+from PyQt5.QtCore import pyqtSignal, QObject
+from PyQt5.QtGui import QColor
+from PyQt5.QtWidgets import QWidget, QPushButton, QHBoxLayout, QSizePolicy, QGridLayout, QLabel, QSlider, \
+    QComboBox, QColorDialog, QCheckBox
 
-class AlternativeDisplay(QWidget):
+from editor.basic_editor import BasicEditor
+from widgets.clickable_label import ClickableLabel
+from util import tr
+from vial_device import VialKeyboard
+
+
+class MagAlternativeDisplay(QWidget):
 
     keycode_changed = pyqtSignal(str)
 
@@ -77,7 +89,7 @@ class AlternativeDisplay(QWidget):
         return len(self.buttons) > 0
 
 
-class Tab(QScrollArea):
+class MagTab(QScrollArea):
 
     keycode_changed = pyqtSignal(str)
 
@@ -90,7 +102,7 @@ class Tab(QScrollArea):
 
         self.alternatives = []
         for kb, keys in alts:
-            alt = AlternativeDisplay(kb, keys, prefix_buttons)
+            alt = MagAlternativeDisplay(kb, keys, prefix_buttons)
             alt.keycode_changed.connect(self.keycode_changed)
             self.layout.addWidget(alt)
             self.alternatives.append(alt)
@@ -134,7 +146,7 @@ class Tab(QScrollArea):
         self.select_alternative()
 
 
-class SimpleTab(Tab):
+class MagSimpleTab(MagTab):
 
     def __init__(self, parent, label, keycodes):
         super().__init__(parent, label, [(None, keycodes)])
@@ -144,11 +156,11 @@ def keycode_filter_any(kc):
     return True
 
 
-def keycode_filter_masked(kc):
+def mag_keycode_filter_masked(kc):
     return Keycode.is_basic(kc)
 
 
-class FilteredTabbedKeycodes(QTabWidget):
+class MagFilteredTabbedKeycodes(QTabWidget):
 
     keycode_changed = pyqtSignal(str)
     anykey = pyqtSignal()
@@ -159,29 +171,29 @@ class FilteredTabbedKeycodes(QTabWidget):
         self.keycode_filter = keycode_filter
 
         self.tabs = [
-            Tab(self, "Basic", [
+            MagTab(self, "Basic", [
                 (ansi_100, KEYCODES_SPECIAL + KEYCODES_SHIFTED),
                 (ansi_80, KEYCODES_SPECIAL + KEYCODES_BASIC_NUMPAD + KEYCODES_SHIFTED),
                 (ansi_70, KEYCODES_SPECIAL + KEYCODES_BASIC_NUMPAD + KEYCODES_BASIC_NAV + KEYCODES_SHIFTED),
                 (None, KEYCODES_SPECIAL + KEYCODES_BASIC + KEYCODES_SHIFTED),
             ], prefix_buttons=[("Any", -1)]),
-            Tab(self, "ISO/JIS", [
+            MagTab(self, "ISO/JIS", [
                 (iso_100, KEYCODES_SPECIAL + KEYCODES_SHIFTED + KEYCODES_ISO_KR),
                 (iso_80, KEYCODES_SPECIAL + KEYCODES_BASIC_NUMPAD + KEYCODES_SHIFTED + KEYCODES_ISO_KR),
                 (iso_70, KEYCODES_SPECIAL + KEYCODES_BASIC_NUMPAD + KEYCODES_BASIC_NAV + KEYCODES_SHIFTED +
                  KEYCODES_ISO_KR),
                 (None, KEYCODES_ISO),
             ], prefix_buttons=[("Any", -1)]),
-            SimpleTab(self, "Layers", KEYCODES_LAYERS),
-            Tab(self, "Quantum", [(mods, (KEYCODES_BOOT + KEYCODES_QUANTUM)),
+            MagSimpleTab(self, "Layers", KEYCODES_LAYERS),
+            MagTab(self, "Quantum", [(mods, (KEYCODES_BOOT + KEYCODES_QUANTUM)),
                                   (mods_narrow, (KEYCODES_BOOT + KEYCODES_QUANTUM)),
                                   (None, (KEYCODES_BOOT + KEYCODES_MODIFIERS + KEYCODES_QUANTUM))]),
-            SimpleTab(self, "Backlight", KEYCODES_BACKLIGHT),
-            SimpleTab(self, "App, Media and Mouse", KEYCODES_MEDIA),
-            SimpleTab(self, "MIDI", KEYCODES_MIDI),
-            SimpleTab(self, "Tap Dance", KEYCODES_TAP_DANCE),
-            SimpleTab(self, "User", KEYCODES_USER),
-            SimpleTab(self, "Macro", KEYCODES_MACRO),
+            MagSimpleTab(self, "Backlight", KEYCODES_BACKLIGHT),
+            MagSimpleTab(self, "App, Media and Mouse", KEYCODES_MEDIA),
+            MagSimpleTab(self, "MIDI", KEYCODES_MIDI),
+            MagSimpleTab(self, "Tap Dance", KEYCODES_TAP_DANCE),
+            MagSimpleTab(self, "User", KEYCODES_USER),
+            MagSimpleTab(self, "Macro", KEYCODES_MACRO),
         ]
 
         for tab in self.tabs:
@@ -213,28 +225,75 @@ class FilteredTabbedKeycodes(QTabWidget):
             tab.relabel_buttons()
 
 
-class TabbedKeycodes(QWidget):
+class MagTabbedKeycodes(QWidget):
 
-    keycode_changed = pyqtSignal(str)
+    th_val_changed = pyqtSignal(int)
+    rt_sw_changed = pyqtSignal(int)
+    rt_th_val_changed = pyqtSignal(int)
     anykey = pyqtSignal()
 
     def __init__(self):
         super().__init__()
 
-        self.target = None
-        self.is_tray = False
+        layout = QVBoxLayout()
+        layout.addStretch()
 
-        self.layout = QVBoxLayout()
+        self.mag_th_lb = QLabel(tr("MAGConfigurator", "Mag_Trigger_TH"))
+        layout.addWidget(self.mag_th_lb)
+        self.mag_th_sd = QSlider(QtCore.Qt.Horizontal)
+        self.mag_th_sd.setMinimum(1)
+        self.mag_th_sd.setMaximum(199)
+        self.mag_th_sd.valueChanged.connect(self.th_val_changed)
+        layout.addWidget(self.mag_th_sd)
 
-        self.all_keycodes = FilteredTabbedKeycodes()
-        self.basic_keycodes = FilteredTabbedKeycodes(keycode_filter=keycode_filter_masked)
-        for opt in [self.all_keycodes, self.basic_keycodes]:
-            opt.keycode_changed.connect(self.keycode_changed)
-            opt.anykey.connect(self.anykey)
-            self.layout.addWidget(opt)
+        self.mag_rt_sw_lb = QLabel(tr("MAGConfigurator", "Mag_RT_SW"))
+        layout.addWidget(self.mag_rt_sw_lb)
+        checkbox = QCheckBox()
+        checkbox.stateChanged.connect(self.rt_sw_changed)
+        layout.addWidget(checkbox)
 
-        self.setLayout(self.layout)
-        self.set_keycode_filter(keycode_filter_any)
+
+        self.mag_rt_th_lb = QLabel(tr("MAGConfigurator", "Mag_RT_TH"))
+        layout.addWidget(self.mag_rt_th_lb)
+        self.mag_rt_th_sd = QSlider(QtCore.Qt.Horizontal)
+        self.mag_rt_th_sd.setMinimum(1)
+        self.mag_rt_th_sd.setMaximum(199)
+        self.mag_rt_th_sd.valueChanged.connect(self.rt_th_val_changed)
+        layout.addWidget(self.mag_rt_th_sd)
+
+        save_btn = QPushButton(tr("MAGConfigurator", "Save"))
+        save_btn.clicked.connect(self.on_save)
+        layout.addWidget(save_btn)
+        save_btn.show()
+
+
+
+        self.setLayout(layout)
+
+
+
+
+        # self.target = None
+        # self.is_tray = False
+
+        # self.layout = QVBoxLayout()
+
+        # self.all_keycodes = MagFilteredTabbedKeycodes()
+        # self.basic_keycodes = MagFilteredTabbedKeycodes(keycode_filter=mag_keycode_filter_masked)
+        # for opt in [self.all_keycodes, self.basic_keycodes]:
+        #     opt.keycode_changed.connect(self.keycode_changed)
+        #     opt.anykey.connect(self.anykey)
+        #     self.layout.addWidget(opt)
+
+        # self.setLayout(self.layout)
+        # self.set_keycode_filter(keycode_filter_any)
+
+    def on_save(self):
+        pass
+    def on_change(self):
+        pass
+    def on_mag_th_changed(self):
+        pass
 
     @classmethod
     def set_tray(cls, tray):
@@ -257,25 +316,28 @@ class TabbedKeycodes(QWidget):
 
     def make_tray(self):
         self.is_tray = True
-        TabbedKeycodes.set_tray(self)
+        MagTabbedKeycodes.set_tray(self)
 
-        self.keycode_changed.connect(self.on_tray_keycode_changed)
+        self.rt_sw_changed.connect(self.on_tray_keycode_changed)
         self.anykey.connect(self.on_tray_anykey)
 
     def on_tray_keycode_changed(self, kc):
+        print("00000000000000")
         if self.target is not None:
             self.target.on_keycode_changed(kc)
 
     def on_tray_anykey(self):
-        if self.target is not None:
-            self.target.on_anykey()
+        print("8888888888888")
+        pass
+        # if self.target is not None:
+        #     self.target.on_anykey()
 
     def recreate_keycode_buttons(self):
         for opt in [self.all_keycodes, self.basic_keycodes]:
             opt.recreate_keycode_buttons()
 
     def set_keycode_filter(self, keycode_filter):
-        if keycode_filter == keycode_filter_masked:
+        if keycode_filter == mag_keycode_filter_masked:
             self.all_keycodes.hide()
             self.basic_keycodes.show()
         else:
