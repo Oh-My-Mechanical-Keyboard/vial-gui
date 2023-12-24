@@ -278,6 +278,8 @@ class KeyboardWidget(QWidget):
         self.active_key = None
         self.active_mask = False
 
+        self.magnet_text = False
+
     def set_keys(self, keys, encoders):
         self.common_widgets = []
         self.widgets_for_layout = []
@@ -410,7 +412,10 @@ class KeyboardWidget(QWidget):
         foreground_on_brush.setStyle(Qt.SolidPattern)
 
         mask_font = qp.font()
-        mask_font.setPointSize(round(mask_font.pointSize() * 0.8))
+        if self.magnet_text:
+            mask_font.setPointSize(round(mask_font.pointSize() * 0.5))
+        else:
+            mask_font.setPointSize(round(mask_font.pointSize() * 0.8))
 
         for idx, key in enumerate(self.widgets):
             qp.save()

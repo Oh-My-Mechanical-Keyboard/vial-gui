@@ -19,7 +19,6 @@ from editor.firmware_flasher import FirmwareFlasher
 from editor.key_override import KeyOverride
 from protocol.keyboard_comm import ProtocolError
 from editor.keymap_editor import KeymapEditor
-from editor.magnet_editor import MagKeymapEditor
 from keymaps import KEYMAPS
 from editor.layout_editor import LayoutEditor
 from editor.macro_recorder import MacroRecorder
@@ -31,6 +30,7 @@ from unlocker import Unlocker
 from util import tr, EXAMPLE_KEYBOARDS, KeycodeDisplay, EXAMPLE_KEYBOARD_PREFIX
 from vial_device import VialKeyboard
 from editor.matrix_test import MatrixTest
+from editor.magnet_apc_rt import ApcRt
 
 import themes
 
@@ -72,10 +72,6 @@ class MainWindow(QMainWindow):
 
         self.layout_editor = LayoutEditor()
         self.keymap_editor = KeymapEditor(self.layout_editor)
-
-        self.mag_layout_editor = LayoutEditor()
-        self.mag_keymap_editor = MagKeymapEditor(self.mag_layout_editor)
-
         self.firmware_flasher = FirmwareFlasher(self)
         self.macro_recorder = MacroRecorder()
         self.tap_dance = TapDance()
@@ -85,12 +81,13 @@ class MainWindow(QMainWindow):
         self.qmk_settings = QmkSettings()
         self.matrix_tester = MatrixTest(self.layout_editor)
         self.rgb_configurator = RGBConfigurator()
+        self.apc_rt = ApcRt(self.layout_editor)
 
         self.editors = [(self.keymap_editor, "Keymap"), (self.layout_editor, "Layout"), (self.macro_recorder, "Macros"),
                         (self.rgb_configurator, "Lighting"), (self.tap_dance, "Tap Dance"), (self.combos, "Combos"),
                         (self.key_override, "Key Overrides"), (self.qmk_settings, "QMK Settings"),
                         (self.matrix_tester, "Matrix tester"), (self.firmware_flasher, "Firmware updater"),
-                        (self.mag_keymap_editor, "Mag Keymap"), (self.mag_layout_editor, "Mag Layout")]
+                        (self.apc_rt, "Magnet APC/RT")]
 
         Unlocker.global_layout_editor = self.layout_editor
         Unlocker.global_main_window = self
@@ -316,7 +313,8 @@ class MainWindow(QMainWindow):
 
         for e in [self.layout_editor, self.keymap_editor, self.firmware_flasher, self.macro_recorder,
                   self.tap_dance, self.combos, self.key_override, self.qmk_settings, self.matrix_tester,
-                  self.rgb_configurator, self.mag_layout_editor, self.mag_keymap_editor]:
+                  self.rgb_configurator,
+                  self.apc_rt]:
             e.rebuild(self.autorefresh.current_device)
 
     def refresh_tabs(self):
