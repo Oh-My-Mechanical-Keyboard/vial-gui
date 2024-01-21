@@ -45,9 +45,35 @@ class ApcRt(BasicEditor):
 
         layout = QVBoxLayout()
         layout.addWidget(self.keyboardWidget)
-        layout.setAlignment(self.keyboardWidget, Qt.AlignCenter)
+        # layout.setAlignment(self.keyboardWidget, Qt.AlignCenter)
 
         self.addLayout(layout)
+
+        switch_show_layout = QVBoxLayout()
+        self.switch_adc_lbl = QLabel(tr("Switch ADC", "Current key adc: NAN"))
+        switch_show_layout.addWidget(self.switch_adc_lbl)
+        show_pgb_layout = QHBoxLayout()
+        self.show_sw_pgb = QProgressBar()
+        self.show_sw_pgb.setMinimum(0)
+        self.show_sw_pgb.setMaximum(200)
+        self.show_sw_pgb.setValue(0)
+        self.show_sw_pgb.setOrientation(Qt.Vertical)
+        self.show_sw_pgb.setMaximumWidth(30)
+        self.show_sw_pgb.setMinimumWidth(15)
+        self.show_sw_pgb.setMaximumHeight(100)
+        self.show_sw_pgb.setMinimumHeight(90)
+        self.show_sw_pgb.setTextVisible(False)
+        self.show_sw_pgb.setInvertedAppearance(True)
+        show_pgb_layout.addWidget(self.show_sw_pgb)
+        switch_show_layout.addLayout(show_pgb_layout)
+        self.show_sw_lbl = QLabel(tr("Switch Travel: ", "Key travel: NAN"))
+        switch_show_layout.addWidget(self.show_sw_lbl)
+        
+
+        self.show_sw_timer = QTimer()
+        self.show_sw_timer_interval = 200
+        self.show_sw_timer.timeout.connect(self.show_sw_timer_cbk)
+
 
         apc_rt_layout = QGridLayout()
 
@@ -119,34 +145,72 @@ class ApcRt(BasicEditor):
         apc_rt_layout.addWidget(self.rt_set_dpb, 3, 1)
         apc_rt_layout.addWidget(self.rt_set_sld, 3, 2)
 
-        switch_show_layout = QVBoxLayout()
-        self.switch_adc_lbl = QLabel(tr("Switch ADC", "Current key adc: NAN"))
-        switch_show_layout.addWidget(self.switch_adc_lbl)
-        show_pgb_layout = QHBoxLayout()
-        self.show_sw_pgb = QProgressBar()
-        self.show_sw_pgb.setMinimum(0)
-        self.show_sw_pgb.setMaximum(200)
-        self.show_sw_pgb.setValue(0)
-        self.show_sw_pgb.setOrientation(Qt.Vertical)
-        self.show_sw_pgb.setTextVisible(False)
-        self.show_sw_pgb.setInvertedAppearance(True)
-        show_pgb_layout.addWidget(self.show_sw_pgb)
-        switch_show_layout.addLayout(show_pgb_layout)
-        self.show_sw_lbl = QLabel(tr("Switch Travel: ", "Key travel: NAN"))
-        switch_show_layout.addWidget(self.show_sw_lbl)
-        
 
-        self.show_sw_timer = QTimer()
-        self.show_sw_timer_interval = 100
-        self.show_sw_timer.timeout.connect(self.show_sw_timer_cbk)
+        deadband_layout = QVBoxLayout()
+        self.deadband_lbl = QLabel(tr("Deadband", "Deadband Setting (Global)"))
+        deadband_layout.addWidget(self.deadband_lbl)
 
+        deadband_top_ctl_layout = QHBoxLayout()
+        self.top_deadband_lbl = QLabel(tr("Top Deadband", "Top Deadband:"))
+        self.top_deadband_dpb = QDoubleSpinBox()
+        self.top_deadband_dpb.setRange(0, 1.0)
+        self.top_deadband_dpb.setValue(0.2)
+        self.top_deadband_dpb.setSingleStep(0.1)
+        self.top_deadband_dpb.valueChanged.connect(self.on_deadband_dpb)
+        self.top_deadband_sld = QSlider(Qt.Horizontal)
+        self.top_deadband_sld.setMaximumWidth(200)
+        self.top_deadband_sld.setMinimumWidth(100)
+        self.top_deadband_sld.setRange(0, 50)
+        self.top_deadband_sld.setSingleStep(5)
+        self.top_deadband_sld.setValue(10)
+        self.top_deadband_sld.setTickPosition(QSlider.TicksAbove)
+        self.top_deadband_sld.setTracking(False)
+        self.top_deadband_sld.valueChanged.connect(self.on_deadband_sld)
 
-        layout = QHBoxLayout()
-        layout.addLayout(switch_show_layout)
-        layout.addStretch(1)
-        layout.addLayout(apc_rt_layout)
-        layout.addStretch(1)
-        self.addLayout(layout)
+        deadband_top_ctl_layout.addWidget(self.top_deadband_lbl)
+        deadband_top_ctl_layout.addWidget(self.top_deadband_dpb)
+        deadband_top_ctl_layout.addWidget(self.top_deadband_sld)
+
+        deadband_layout.addLayout(deadband_top_ctl_layout)
+
+        self.top_deadband_tip_lbl = QLabel(tr("Top Deadband Tip", "Never trigger in top deadband."))
+        deadband_layout.addWidget(self.top_deadband_tip_lbl)
+  
+        deadband_bottom_ctl_layout = QHBoxLayout()
+        self.bottom_deadband_lbl = QLabel(tr("Bottom Deadband", "Bottom Deadband:"))
+        self.bottom_deadband_dpb = QDoubleSpinBox()
+        self.bottom_deadband_dpb.setRange(0, 1.0)
+        self.bottom_deadband_dpb.setValue(0.2)
+        self.bottom_deadband_dpb.setSingleStep(0.1)
+        self.bottom_deadband_dpb.valueChanged.connect(self.on_deadband_dpb)
+        self.bottom_deadband_sld = QSlider(Qt.Horizontal)
+        self.bottom_deadband_sld.setMaximumWidth(200)
+        self.bottom_deadband_sld.setMinimumWidth(100)
+        self.bottom_deadband_sld.setRange(0, 50)
+        self.bottom_deadband_sld.setSingleStep(5)
+        self.bottom_deadband_sld.setValue(10)
+        self.bottom_deadband_sld.setTickPosition(QSlider.TicksAbove)
+        self.bottom_deadband_sld.setTracking(False)
+        self.bottom_deadband_sld.valueChanged.connect(self.on_deadband_sld)
+
+        deadband_bottom_ctl_layout.addWidget(self.bottom_deadband_lbl)
+        deadband_bottom_ctl_layout.addWidget(self.bottom_deadband_dpb)
+        deadband_bottom_ctl_layout.addWidget(self.bottom_deadband_sld)
+
+        deadband_layout.addLayout(deadband_bottom_ctl_layout)
+
+        self.top_deadband_tip_lbl = QLabel(tr("Bottom Deadband Tip", "Always trigger in bottom deadband."))
+        deadband_layout.addWidget(self.top_deadband_tip_lbl)
+
+        mag_layout = QHBoxLayout()
+        mag_layout.addStretch(1)
+        mag_layout.addLayout(switch_show_layout)
+        mag_layout.addStretch(1)
+        mag_layout.addLayout(apc_rt_layout)
+        mag_layout.addStretch(1)
+        mag_layout.addLayout(deadband_layout)
+        mag_layout.addStretch(1)
+        self.addLayout(mag_layout)
 
         self.keyboard = None
         self.device = None
@@ -159,11 +223,9 @@ class ApcRt(BasicEditor):
             row = self.keyboardWidget.active_key.desc.row
             col = self.keyboardWidget.active_key.desc.col
             data = self.keyboard.get_adc(row, col)
-            print("adc: ", data)
             txt = "Current key adc: " + str(data)
             self.switch_adc_lbl.setText(txt)
             data = self.keyboard.get_travel(row, col)
-            print("lv: ", data)
             self.show_sw_pgb.setValue(data)
             data = data*0.02
             if data >= 4.0:
@@ -171,14 +233,11 @@ class ApcRt(BasicEditor):
             txt = "Key travel: {:.2f}mm".format(data)
             self.show_sw_lbl.setText(txt)
         except:
+            print("excepttttttttttttttt")
             self.show_sw_timer.stop()
             self.switch_adc_lbl.setText("Current key adc: NAN")
             self.show_sw_pgb.setValue(0)
             self.show_sw_lbl.setText("Key travel: NAN")
-
-
-
-
 
     def rebuild(self, device):
         super().rebuild(device)
@@ -201,8 +260,26 @@ class ApcRt(BasicEditor):
         for widget in self.keyboardWidget.widgets:
             apc_rt_display(widget, self.keyboard.mag_apc[(widget.desc.row, widget.desc.col)],
                         self.keyboard.mag_rt[(widget.desc.row, widget.desc.col)])
-
             widget.setOn(False)
+        
+        self.show_sw_timer.stop()
+        
+        if self.keyboard is not None:
+            self.top_deadband_sld.blockSignals(True)
+            self.top_deadband_dpb.blockSignals(True)
+            self.bottom_deadband_sld.blockSignals(True)
+            self.bottom_deadband_dpb.blockSignals(True)
+
+            self.top_deadband_sld.setValue(self.keyboard.top_deadband_lv)
+            self.top_deadband_dpb.setValue(self.keyboard.top_deadband_lv*0.02)
+
+            self.bottom_deadband_sld.setValue(self.keyboard.bottom_deadband_lv)
+            self.bottom_deadband_dpb.setValue(self.keyboard.bottom_deadband_lv*0.02)
+
+            self.bottom_deadband_dpb.blockSignals(False)
+            self.bottom_deadband_sld.blockSignals(False)
+            self.top_deadband_dpb.blockSignals(False)
+            self.top_deadband_sld.blockSignals(False)
 
         self.keyboardWidget.update()
         self.keyboardWidget.updateGeometry()
@@ -210,7 +287,7 @@ class ApcRt(BasicEditor):
     def reset_active_apcrt(self):
         if self.keyboardWidget.active_key is None:
             return
-        
+
         widget = self.keyboardWidget.active_key
         row = widget.desc.row
         col = widget.desc.col
@@ -320,6 +397,38 @@ class ApcRt(BasicEditor):
         self.rt_set_sld.blockSignals(False)
         self.rt_cbx.blockSignals(False)
         self.reset_active_apcrt()
+
+    def on_deadband_dpb(self):
+        self.top_deadband_sld.blockSignals(True)
+        self.top_deadband_dpb.blockSignals(True)
+        self.bottom_deadband_sld.blockSignals(True)
+        self.bottom_deadband_dpb.blockSignals(True)
+        top_val = int(self.top_deadband_dpb.value()/0.02)
+        bottom_val = int(self.bottom_deadband_dpb.value()/0.02)
+        self.top_deadband_sld.setValue(top_val)
+        self.bottom_deadband_sld.setValue(bottom_val)
+        if self.keyboard is not None:
+            self.keyboard.apply_deadband(top_val, bottom_val)
+        self.bottom_deadband_dpb.blockSignals(False)
+        self.bottom_deadband_sld.blockSignals(False)
+        self.top_deadband_dpb.blockSignals(False)
+        self.top_deadband_sld.blockSignals(False)
+
+    def on_deadband_sld(self):
+        self.top_deadband_sld.blockSignals(True)
+        self.top_deadband_dpb.blockSignals(True)
+        self.bottom_deadband_sld.blockSignals(True)
+        self.bottom_deadband_dpb.blockSignals(True)
+        top_val = self.top_deadband_sld.value()*0.02
+        bottom_val = self.bottom_deadband_sld.value()*0.02
+        self.top_deadband_dpb.setValue(top_val)
+        self.bottom_deadband_dpb.setValue(bottom_val)
+        if self.keyboard is not None:
+            self.keyboard.apply_deadband(self.top_deadband_sld.value(), self.bottom_deadband_sld.value())
+        self.bottom_deadband_dpb.blockSignals(False)
+        self.bottom_deadband_sld.blockSignals(False)
+        self.top_deadband_dpb.blockSignals(False)
+        self.top_deadband_sld.blockSignals(False)
 
     def on_apc_dpb(self):
         self.apc_sld.blockSignals(True)

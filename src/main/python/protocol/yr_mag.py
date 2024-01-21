@@ -26,7 +26,8 @@ YR_PROTOCOL_MAG_RT_ALL = 7
 YR_PROTOCOL_MAG_ADVANCE_DKS = 8
 YR_PROTOCOL_MAG_ADC_SHOW = 9
 YR_PROTOCOL_MAG_TRAVEL_SHOW = 10
-YR_PROTOCOL_MAG_ALL = 11
+YR_PROTOCOL_MAG_DEADBAND = 11
+YR_PROTOCOL_MAG_ALL = 12
 
 DKS_EVENT_0 = 0
 DKS_EVENT_1 = 1
@@ -261,6 +262,13 @@ class ProtocolYrMag(BaseProtocol):
             # rt_sw, rt_th, rt_set_th
             self.mag_rt[(row, col)] = [data[5]&0xff, data[6]&0xff, data[7]&0xff]
             
+    def reload_deadband(self):
+        """ Reload RT information from keyboard """
+        data = self.get_deadband()
+        # rt_sw, rt_th, rt_set_th
+        self.top_deadband_lv = data[0]
+        self.bottom_deadband_lv = data[1]
+            
     def reload_dks(self):
         pass
         # """ Reload DKS information from keyboard """
@@ -290,7 +298,7 @@ class ProtocolYrMag(BaseProtocol):
     def apply_apc(self, row, col, val):
         if self.mag_apc[(row,col)] == val:
             return
-        print("Update APC at({},{}), old({}), new({})".format(row, col, self.mag_apc[(row,col)], val))
+        print("Update APC at({},{}), old({}) -> new({})".format(row, col, self.mag_apc[(row,col)], val))
         self.mag_apc[(row,col)] = val
         data = struct.pack("BBBBBB", YR_PROTOCOL_MAG_SET, YR_PROTOCOL_MAG_PREFIX, YR_PROTOCOL_MAG_APC, row, col, val)
         data = self.usb_send(self.dev, data, retries=20)
@@ -301,9 +309,18 @@ class ProtocolYrMag(BaseProtocol):
             return
         if ori_val[0] == val[0] and ori_val[1] == val[1] and ori_val[2] == val[2] :
             return
-        print("Update RT at({},{}), old({}), new({})".format(row, col, self.mag_rt[(row,col)], val))
+        print("Update RT at({},{}), old({}) -> new({})".format(row, col, self.mag_rt[(row,col)], val))
         self.mag_rt[(row,col)] = val
         data = struct.pack("BBBBBBBB", YR_PROTOCOL_MAG_SET, YR_PROTOCOL_MAG_PREFIX, YR_PROTOCOL_MAG_RT_ALL, row, col, val[0], val[1], val[2])
+        data = self.usb_send(self.dev, data, retries=20)
+
+    def apply_deadband(self, top_lv, bottom_lv):
+        if self.top_deadband_lv == top_lv and self.bottom_deadband_lv == bottom_lv:
+            return
+        print("Update Deadband, old({}, {}) -> new({}, {})".format(self.top_deadband_lv, self.bottom_deadband_lv, top_lv, bottom_lv))
+        self.top_deadband_lv = top_lv
+        self.bottom_deadband_lv = bottom_lv
+        data = struct.pack("BBBBB", YR_PROTOCOL_MAG_SET, YR_PROTOCOL_MAG_PREFIX, YR_PROTOCOL_MAG_DEADBAND, top_lv, bottom_lv)
         data = self.usb_send(self.dev, data, retries=20)
 
     def get_adc(self, row, col):
@@ -316,3 +333,8 @@ class ProtocolYrMag(BaseProtocol):
         data = self.usb_send(self.dev, data, retries=20)
         travel = (data[5] & 0xff)
         return travel
+    def get_deadband(self):
+        data = struct.pack("BBB", YR_PROTOCOL_MAG_GET, YR_PROTOCOL_MAG_PREFIX, YR_PROTOCOL_MAG_DEADBAND)
+        data = self.usb_send(self.dev, data, retries=20)
+        deadband = (data[3], data[4])
+        return deadband

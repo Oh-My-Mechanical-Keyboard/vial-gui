@@ -99,13 +99,15 @@ class Keyboard(ProtocolMacro, ProtocolDynamic, ProtocolTapDance, ProtocolCombo, 
 
         #reload apc/rt/dks if support
         if self.keyboard_type == "magnet":
-            print("Start loading magnet related data")
             self.mag_apc = dict()
             self.reload_apc()
             self.mag_rt = dict()
             self.reload_rt()
             self.mag_dks = dict()
             self.reload_dks()
+            self.top_deadband_lv = 0
+            self.bottom_deadband_lv = 0
+            self.reload_deadband()
 
     def reload_layers(self):
         """ Get how many layers the keyboard has """
